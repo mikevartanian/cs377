@@ -1,4 +1,6 @@
 #include<iostream>
+#include<unistd.h>
+#include<ctime>
 #include<stdio.h>
 #include<stdlib.h>
 #include<semaphore.h>
@@ -27,8 +29,11 @@ class Request
 };
 char* getTime()
 {
-    time_t timev;
-    return asctime(localtime(&timev));
+    time_t timev = time(0);
+    struct tm* now = localtime(&timev);
+    char* words = "mike\n";
+    return words;
+
 }
 
 class BoundedBuffer
@@ -41,9 +46,10 @@ class BoundedBuffer
 	int globalID;
 	int circularIndex;
 	int N;
+	int maxTTL;
 
     public:
-	BoundedBuffer(int N)
+	BoundedBuffer(int N, int maxTTL)
 	{
 	    sem_init(&mutex,1,1);
 	    sem_init(&empty,1,N); 
@@ -57,17 +63,20 @@ class BoundedBuffer
 	    globalID = 0;
 	    circularIndex = 0;
 	    this->N = N;
+	    this->maxTTL = maxTTL;
 	}
 	void Producer()
 	{
 	    while(true)
 	    {
 	    circularIndex = 0;
-	    Request r(globalID,5);
+	    int ttl = (rand()%maxTTL)+1;
+	    Request r(globalID,ttl);
 	    sem_wait(&empty);
 	    sem_wait(&mutex);
 	    globalID++;
 	    printf("Producer: produced request ID %d, length %d at\n at %s",r.getID(),r.getTTL(),getTime());
+	    sleep(ttl);
 	    while(buffer[circularIndex].getID()!=-1)
 	    {
 		circularIndex++;
@@ -90,7 +99,8 @@ class BoundedBuffer
 	    }
 	    Request r = buffer[circularIndex];
 	    printf("Consumer processing request %d\n",r.getID());
-	    sleep(5);
+	    puts("Consumer sleeping");
+	    sleep(r.getTTL());
 	    Request dummyRequest(-1,0);
 	    buffer[circularIndex] = dummyRequest;
 	    sem_post(&mutex);
@@ -110,21 +120,13 @@ int main(int argc, char* argv[])
 {   
     int numThreads = atoi(argv[1]);
     int maxTTL = atoi(argv[2]);
-    BoundedBuffer* b = new BoundedBuffer(numThreads);
+    BoundedBuffer* b = new BoundedBuffer(numThreads,maxTTL);
     pthread_t threads[numThreads];
-    while(true)
-    {
-    b->Producer();
     for(int i=0;i<numThreads;i++)
     {
-	b->Consumer();
 	pthread_create(&threads[i],NULL,performWork,(void*) b);
     }
-    for(int i=0;i<numThreads;i++)
-    {
-	pthread_join(threads[i],NULL);
-    }
-    }
+    b->Producer();
     pthread_exit(NULL);
     return 0;
 }
