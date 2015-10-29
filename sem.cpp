@@ -30,9 +30,7 @@ class Request
 char* getTime()
 {
     time_t timev = time(0);
-    struct tm* now = localtime(&timev);
-    char* words = "mike\n";
-    return words;
+    return asctime(localtime(&timev));
 
 }
 
@@ -69,7 +67,6 @@ class BoundedBuffer
 	{
 	    while(true)
 	    {
-	    circularIndex = 0;
 	    int ttl = (rand()%maxTTL)+1;
 	    Request r(globalID,ttl);
 	    sem_wait(&empty);
@@ -77,11 +74,15 @@ class BoundedBuffer
 	    globalID++;
 	    printf("Producer: produced request ID %d, length %d at\n at %s",r.getID(),r.getTTL(),getTime());
 	    sleep(ttl);
-	    while(buffer[circularIndex].getID()!=-1)
-	    {
-		circularIndex++;
-	    }
-	    buffer[circularIndex] = r;
+		buffer[circularIndex] = r;
+		if(circularIndex == N-1)
+		{
+		    circularIndex = 0;
+		}
+		else
+		{
+		    circularIndex = 0;
+		}
 	    sem_post(&mutex);
 	    sem_post(&full);
 	    }
