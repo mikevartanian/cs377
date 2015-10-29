@@ -112,7 +112,7 @@ void *work(void *arg)
 char* getTime()
 {
     time_t timev;
-    return asctime(localtime(&timev));
+    return asctime(&time)
 }
 
 int main(int argc, char *argv[])

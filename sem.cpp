@@ -25,6 +25,12 @@ class Request
 	    return ttl;
 	}
 };
+char* getTime()
+{
+    time_t timev;
+    return asctime(localtime(&timev));
+}
+
 class BoundedBuffer
 {
       private:
@@ -54,12 +60,14 @@ class BoundedBuffer
 	}
 	void Producer()
 	{
+	    while(true)
+	    {
 	    circularIndex = 0;
+	    Request r(globalID,5);
 	    sem_wait(&empty);
 	    sem_wait(&mutex);
-	    Request r(globalID,5);
 	    globalID++;
-	    printf("Producer: produced request ID %d, length %d at\n",r.getID(),r.getTTL());
+	    printf("Producer: produced request ID %d, length %d at\n at %s",r.getID(),r.getTTL(),getTime());
 	    while(buffer[circularIndex].getID()!=-1)
 	    {
 		circularIndex++;
@@ -67,9 +75,12 @@ class BoundedBuffer
 	    buffer[circularIndex] = r;
 	    sem_post(&mutex);
 	    sem_post(&full);
+	    }
 	}
 	void Consumer()
 	{
+	   while(true)
+	   {
 	    circularIndex = 0;
 	    sem_wait(&full);
 	    sem_wait(&mutex);
@@ -79,22 +90,42 @@ class BoundedBuffer
 	    }
 	    Request r = buffer[circularIndex];
 	    printf("Consumer processing request %d\n",r.getID());
+	    sleep(5);
 	    Request dummyRequest(-1,0);
 	    buffer[circularIndex] = dummyRequest;
 	    sem_post(&mutex);
 	    sem_post(&empty);
+	   }
 	}
 };
 
+void* performWork(void* arg)
+{
+    BoundedBuffer* buffer = (BoundedBuffer*)arg;
+    buffer->Consumer();
+    pthread_exit(NULL);
+}
 	    
 int main(int argc, char* argv[])
-{
-    BoundedBuffer b(10);
-    while(1)
+{   
+    int numThreads = atoi(argv[1]);
+    int maxTTL = atoi(argv[2]);
+    BoundedBuffer* b = new BoundedBuffer(numThreads);
+    pthread_t threads[numThreads];
+    while(true)
     {
-	b.Producer();
-	b.Consumer();
+    b->Producer();
+    for(int i=0;i<numThreads;i++)
+    {
+	b->Consumer();
+	pthread_create(&threads[i],NULL,performWork,(void*) b);
     }
+    for(int i=0;i<numThreads;i++)
+    {
+	pthread_join(threads[i],NULL);
+    }
+    }
+    pthread_exit(NULL);
     return 0;
 }
 
