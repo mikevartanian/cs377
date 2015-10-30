@@ -94,33 +94,45 @@ class BoundedBuffer
 	    sem_wait(&empty);
 	    sem_wait(&mutex);
 	    globalID++;
-	    printf("Producer: produced request ID %d, length %d at\n at %s",r.getID(),r.getTTL(),getTime());
-	    sleep(ttl);
+	    printf("Producer: produced request ID %d, length %d at %s",r.getID(),r.getTTL(),getTime());
+	    printf("Producer: sleeping for %d seconds\n",r.getTTL());
             buffer->insert(r);
 	    sem_post(&mutex);
 	    sem_post(&full);
+	    sleep(ttl);
 	    }
 	}
-	void Consumer()
+	void Consumer(int ID)
 	{
 	   while(true)
 	   {
 	    sem_wait(&full);
 	    sem_wait(&mutex);
 	    Request r = buffer->get();
-	    printf("Consumer processing request %d\n",r.getID());
-	    printf("Consumer sleeping for the next %d seconds\n",r.getTTL());
-	    sleep(r.getTTL());
 	    sem_post(&mutex);
 	    sem_post(&empty);
+	    printf("Consumer %d: assigned request ID %d, processing request for the next %d seconds, current time is %s",ID,r.getID(),r.getTTL(),getTime());
+	    sleep(r.getTTL());
+	    printf("Consumer %d: completed request ID %d at %s",ID,r.getID(),getTime());
 	   }
+	}
+};
+class arguments
+{
+    public:
+	BoundedBuffer* b;
+	int ID;
+	arguments(BoundedBuffer* b, int ID)
+	{
+	    this->b = b;
+	    this->ID = ID;
 	}
 };
 
 void* performWork(void* arg)
 {
-    BoundedBuffer* buffer = (BoundedBuffer*)arg;
-    buffer->Consumer();
+    arguments *args = (arguments*)arg;
+    args->b->Consumer(args->ID);
     pthread_exit(NULL);
 }
 void* masterWork(void* arg)
@@ -129,7 +141,8 @@ void* masterWork(void* arg)
     buffer->Producer();
     pthread_exit(NULL);
 }
-	    
+
+
 int main(int argc, char* argv[])
 {   
     int numThreads = atoi(argv[1]); 
@@ -137,9 +150,11 @@ int main(int argc, char* argv[])
     BoundedBuffer* b = new BoundedBuffer(numThreads,maxTTL);
     pthread_t threads[numThreads]; //consumer threads
     pthread_t master; //producer thread
+    
     for(int i=0;i<numThreads;i++)
     {
-	pthread_create(&threads[i],NULL,performWork,(void*) b); //starts the consumers
+	arguments* args = new arguments(b,i);
+	pthread_create(&threads[i],NULL,performWork,(void*) args); //starts the consumers
     }
     pthread_create(&master,NULL,masterWork,(void*) b); //starts the producer
     pthread_exit(NULL);
