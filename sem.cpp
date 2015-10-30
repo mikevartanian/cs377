@@ -27,6 +27,8 @@ class Request
 	    return ttl;
 	}
 };
+
+
 char* getTime()
 {
     time_t timev = time(0);
