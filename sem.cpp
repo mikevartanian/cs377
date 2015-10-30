@@ -1,6 +1,5 @@
 #include<iostream>
 #include<unistd.h>
-#include<ctime>
 #include<stdio.h>
 #include<stdlib.h>
 #include<semaphore.h>
@@ -64,7 +63,6 @@ char* getTime()
 {
     time_t timev = time(0);
     return asctime(localtime(&timev));
-
 }
 
 class BoundedBuffer
@@ -75,8 +73,6 @@ class BoundedBuffer
 	sem_t full;
 	Circ* buffer;
 	int globalID;
-	int circularIndex;
-	int N;
 	int maxTTL;
 
     public:
@@ -87,8 +83,6 @@ class BoundedBuffer
 	    sem_init(&full,1,0);
 	    buffer = new Circ(N);
 	    globalID = 0;
-	    circularIndex = -1;
-	    this->N = N;
 	    this->maxTTL = maxTTL;
 	}
 	void Producer()
@@ -138,16 +132,16 @@ void* masterWork(void* arg)
 	    
 int main(int argc, char* argv[])
 {   
-    int numThreads = atoi(argv[1]);
+    int numThreads = atoi(argv[1]); 
     int maxTTL = atoi(argv[2]);
     BoundedBuffer* b = new BoundedBuffer(numThreads,maxTTL);
-    pthread_t threads[numThreads];
-    pthread_t master;
+    pthread_t threads[numThreads]; //consumer threads
+    pthread_t master; //producer thread
     for(int i=0;i<numThreads;i++)
     {
-	pthread_create(&threads[i],NULL,performWork,(void*) b);
+	pthread_create(&threads[i],NULL,performWork,(void*) b); //starts the consumers
     }
-    pthread_create(&master,NULL,masterWork,(void*) b);
+    pthread_create(&master,NULL,masterWork,(void*) b); //starts the producer
     pthread_exit(NULL);
     return 0;
 }
